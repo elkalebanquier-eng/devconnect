@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 const marketplacePage = (name: "BecomeDeveloperPage" | "ClientDashboardPage" | "DeveloperDashboardPage" | "DeveloperProfilePage" | "ExploreProjectsPage" | "FindDeveloperPage" | "HelpSecurityPage" | "ProjectDetailPage") => lazy(() => import("./pages/MarketplacePages").then((module) => ({ default: module[name] })));
 const BecomeDeveloperPage = marketplacePage("BecomeDeveloperPage"); const ClientDashboardPage = marketplacePage("ClientDashboardPage"); const DeveloperDashboardPage = marketplacePage("DeveloperDashboardPage"); const DeveloperProfilePage = marketplacePage("DeveloperProfilePage"); const ExploreProjectsPage = marketplacePage("ExploreProjectsPage"); const FindDeveloperPage = marketplacePage("FindDeveloperPage"); const HelpSecurityPage = marketplacePage("HelpSecurityPage"); const ProjectDetailPage = marketplacePage("ProjectDetailPage");
 import { createProject, backend } from "./lib/integrations";
+import { observeAuth } from "./lib/firebase";
 
 const navItems = [{ label: "Développeurs", href: "/explorer" }, { label: "Projets", href: "/projets" }, { label: "Comment ça marche", href: "/#fonctionnement" }];
 function BrandMark({ inverse = false }: { inverse?: boolean }) { return <Link href="/" className="group flex items-center gap-2.5" aria-label="ONE-X Dev, accueil"><img src="/one-x-dev-logo.png" alt="ONE-X Dev" className="h-10 w-10 rounded-xl object-cover shadow-sm transition-transform duration-200 group-hover:-rotate-3" /><span className={`font-display text-[1.25rem] font-bold tracking-[-.04em] ${inverse ? "text-white" : "text-ink"}`}>ONE<span className={inverse ? "text-[#25c8f4]" : "text-[#0878ed]"}>-X</span> Dev</span></Link>; }
@@ -37,6 +38,25 @@ function MessagesPage() {
 }
 
 function SimplePage({ title, description, icon: Icon = UserRound }: { title: string; description: string; icon?: typeof UserRound }) { return <AppLayout><main className="container flex min-h-[70vh] items-center justify-center py-16"><div className="max-w-lg text-center"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#eaf0ff] text-[#1557f5]"><Icon size={24} /></span><h1 className="mt-6 font-display text-4xl font-bold tracking-[-.05em]">{title}</h1><p className="mt-4 leading-7 text-ink/55">{description}</p><Link href="/" className="mt-7 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3.5 text-sm font-bold text-white">Retour à l'accueil <ArrowRight size={16} /></Link></div></main></AppLayout>; }
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const [location, navigate] = useLocation();
+  const [user, setUser] = useState<import("firebase/auth").User | null | undefined>(undefined);
+
+  useEffect(() => {
+    const unsubscribe = observeAuth((nextUser) => {
+      setUser(nextUser);
+      if (!nextUser && location !== "/connexion") navigate("/connexion");
+    });
+    return unsubscribe;
+  }, [location, navigate]);
+
+  if (user === undefined) {
+    return <div className="grid min-h-screen place-items-center bg-[#fbfaf7] px-6 text-center text-sm font-semibold text-ink/55">Vérification de votre session…</div>;
+  }
+  if (!user && location !== "/connexion") return null;
+  return <>{children}</>;
+}
+
 function Router() { return <Suspense fallback={<div className="grid min-h-[70vh] place-items-center text-sm font-semibold text-ink/45">Chargement de ONE-X Dev…</div>}><Switch><Route path="/" component={() => <AppLayout><Home /></AppLayout>} /><Route path="/explorer" component={() => <AppLayout><FindDeveloperPage /></AppLayout>} /><Route path="/trouver-un-developpeur" component={() => <AppLayout><FindDeveloperPage /></AppLayout>} /><Route path="/projets" component={() => <AppLayout><ExploreProjectsPage /></AppLayout>} /><Route path="/publier" component={PublishPage} /><Route path="/projet/:slug" component={() => <AppLayout><ProjectDetailPage /></AppLayout>} /><Route path="/profil/:slug" component={() => <AppLayout><DeveloperProfilePage /></AppLayout>} /><Route path="/devenir-developpeur" component={() => <AppLayout><BecomeDeveloperPage /></AppLayout>} /><Route path="/dashboard-client" component={() => <AppLayout><ClientDashboardPage /></AppLayout>} /><Route path="/dashboard-developpeur" component={() => <AppLayout><DeveloperDashboardPage /></AppLayout>} /><Route path="/dashboard" component={() => <AppLayout><ClientDashboardPage /></AppLayout>} /><Route path="/aide" component={() => <AppLayout><HelpSecurityPage /></AppLayout>} /><Route path="/connexion" component={() => <AppLayout><AuthPage /></AppLayout>} /><Route path="/admin" component={() => <SimplePage title="Espace administration" description="Cette zone est réservée aux comptes administrateurs vérifiés. L'accès est contrôlé par Firebase." icon={ShieldCheck} />} /><Route path="/messages" component={MessagesPage} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch></Suspense>; }
-function App() { return <ErrorBoundary><ThemeProvider defaultTheme="system" switchable><TooltipProvider><Toaster /><Router /></TooltipProvider></ThemeProvider></ErrorBoundary>; }
+function App() { return <ErrorBoundary><ThemeProvider defaultTheme="system" switchable><TooltipProvider><Toaster /><AuthGate><Router /></AuthGate></TooltipProvider></ThemeProvider></ErrorBoundary>; }
 export default App;
